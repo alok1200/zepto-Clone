@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { userRequest } from '../axiosInstance'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import ProductList from '../components/ProductList';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../redux/cartSlice';
+import { loadScript } from '../helpers/payment';
 
 const Container = styled.div`
   padding: 1rem 0.5rem;  
@@ -131,6 +132,8 @@ const BuyNowButton = styled.button`
 `;
 
 const ProductPage = () => {
+  const user = useSelector(p => p.user.user)
+  console.log(user)
   const [quantity, setQuantity] = useState(1)
   const dispatch = useDispatch()
   const location = useLocation();
@@ -150,6 +153,61 @@ const ProductPage = () => {
   
   const handleAddToCart = () => {
     dispatch(addToCart({...product, quantity}))
+  }
+  const navigate = useNavigate()
+
+  const handleBuy = async (e) => {
+    e.preventDefault();
+
+    if(!user) return navigate('/login')
+
+    let Dborder;
+    const { address, name, email } = user
+    const body = {
+      userInfo: {address, name, email},
+      product: {
+        productID: product._id,
+        quantity: +quantity,
+      }
+    }
+    await loadScript("https://checkout.razorpay.com/v1/checkout.js")
+    try {
+      const {data} = await userRequest.post("order/checkout", body)
+      Dborder = data.order;
+    } catch (error) {
+      
+    }
+
+    if(!window.Razorpay) {
+      await loadScript("https://checkout.razorpay.com/v5/checkout.js") //script is not loading at first time dk why so i added this XD
+    } 
+
+
+
+    var options = {
+        key: "rzp_test_kFsaE7HQ8hKgsu",
+        amount: Dborder.amount,
+        currency: "INR",
+        name: product.title,
+        description: product.description,
+        image: product.img,
+        order_id: Dborder.id, 
+        callback_url: `http://localhost:4000/api/order/verify`,
+        prefill: { 
+            name: user.name,
+            email: user.email,
+            contact: 1212121212
+        },
+        notes: {
+          address: "Dummy Office address"
+        },
+        theme: {
+            "color": "#3399cc"
+        }
+    };
+
+    const rzapi = new window.Razorpay(options);
+    rzapi.open();
   }
 
   return (
@@ -174,7 +232,7 @@ const ProductPage = () => {
                 </QuatitySection>
                 <ButtonWrapper>
                     <AddToCartButton onClick={handleAddToCart}>Add to Cart</AddToCartButton>
-                    <BuyNowButton>Buy Now</BuyNowButton>
+                    <BuyNowButton onClick={handleBuy} >Buy Now</BuyNowButton>
                 </ButtonWrapper>
             </BottomSection>
           </ProductDetails>
