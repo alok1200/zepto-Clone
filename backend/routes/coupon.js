@@ -48,5 +48,17 @@ router.get("/", VerifiedSellerWithToken ,async (req, res) => {
 });
 
 
+router.get("/:agentId" ,async (req, res) => {
+  if(!req.params.agentId) return res.status(400).json({message: "Failed to fetch coupons Please Reload the page"})
+  try {
+    const coupons = await Coupon.find({agentId: req.params.agentId, stock: { "$gt" : 0 } });
+    res.status(200).json(coupons);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 
 module.exports = router;

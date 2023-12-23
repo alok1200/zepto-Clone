@@ -5,6 +5,7 @@ const Products = require("../models/Products");
 const crypto = require("crypto");
 const Orders = require("../models/Orders");
 const ConfirmOrders = require("../models/ConfirmOrders");
+const Coupon = require("../models/Coupon");
 require("dotenv").config()
 
 const instance = new Razorpay({
@@ -20,9 +21,23 @@ router.post("/checkout", verifyToken , async (req,res) => {
 
     if(!dbproduct) return res.status(404).json({success: false, message: "Sorry! Unable to find this product."})
     if(dbproduct.stock <= req.body.product.quantity) return res.status(404).json({success: false, message: "Sorry! This products is currently out of stock"})
+
+  
     
 
     price = dbproduct.price * req.body.product.quantity;
+
+    let couponIdUsed = null
+
+    if(req.body.coupon){
+      const coupon = await Coupon.findById(req.body.coupon)
+      if(dbproduct.price >= coupon.minProductPrice){
+        let percentDiscount = price * coupon.percentageDiscount / 100
+        percentDiscount = percentDiscount <= coupon.maxDiscountAmount ? percentDiscount : coupon.maxDiscountAmount;
+        price = price - percentDiscount
+        couponIdUsed = req.body.coupon
+      }
+    }
     req.finalProduct = {...dbproduct._doc, ...req.body.product} //appending dbProduct info with user product info so that i can store the value in db
 
     const options = {
@@ -33,23 +48,25 @@ router.post("/checkout", verifyToken , async (req,res) => {
     try {
       const response = await instance.orders.create(options) //razorpay SDK call
 
-      const dbOrder = await Orders.create({ // Saving to db
+      const orderBody = { // Saving to db
         userID: req.user.id,
         products: req.finalProduct,
         price: Number(price.toFixed(2)),
         userInfo: {
-          address: req.body.userInfo.address,
+          address: req.body.userInfo.address || "N/A",
           name: req.body.userInfo.name,
           email: req.body.userInfo.email,
         },
         order: response,
-      })
-      res.json({
-        order:{
-          id: response.id,
-          amount: response.amount
-        }
-      })
+      }
+      if(couponIdUsed) {
+        orderBody["coupon"] = couponIdUsed
+        orderBody["discount"] = (dbproduct.price * req.body.product.quantity) - Number(price)
+      }
+
+      await Orders.create(orderBody)
+
+      res.json({ order:{ id: response.id, amount: response.amount } })
     } catch (error) {
       console.log(error)
     }   
@@ -69,6 +86,20 @@ router.post('/verify',async (req, res) => {
             const dborder = await Orders.findOneAndDelete({"order.id": razorpay_order_id})
             if(!dborder) return res.status(400).json({error: "sesson timeout"})
             const data = {...dborder._doc, paymentStatus: true,paymentInfo: req.body }
+
+
+            if(dborder.coupon){
+              const coupon = await Coupon.findById(data.coupon)
+              if(coupon){
+                coupon.totalDiscountAmount += Number(data.discount)
+                coupon.stock -= 1
+                coupon.usedCount += 1
+              }
+
+              console.log(coupon)
+              await coupon.save()
+            }
+
       
             await ConfirmOrders.create(data)
     

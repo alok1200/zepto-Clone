@@ -16,6 +16,8 @@ const { Schema } = mongoose;
             color: {type: String}
         }
     ],
+    coupon: {type: mongoose.Types.ObjectId},
+    discount: {type: Number},
     price: {type: Number, required: true},
     userInfo: {
       address: {type: Object, required: true},
