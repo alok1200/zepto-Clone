@@ -9,15 +9,6 @@ const couponSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  couponType: {
-    type: String,
-    enum: ['allProducts', 'specificProducts'],
-    required: true,
-  },
-  allowedProducts: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
-  }],
   percentageDiscount: {
     type: Number,
     required: true,

@@ -69,7 +69,6 @@ const CouponForm = styled.form`
 
 const AddCoupon = ({ isOpen, onClose }) => {
   const [couponData, setCouponData] = useState({
-    couponType: 'allProducts',
     title: "",
     allowedProducts: [],
     percentageDiscount: 0,
@@ -104,13 +103,6 @@ const AddCoupon = ({ isOpen, onClose }) => {
                 <button onClick={onClose}>Close</button>
             </Head>
             <CouponForm onSubmit={handleSave}>
-              <label>
-                Coupon Type:
-                <select name="couponType" value={couponData.couponType} onChange={handleChange}>
-                  <option value="allProducts">All Products</option>
-                  <option value="specificProducts">Specific Products</option>
-                </select>
-              </label>
               <label>
                 Title:
                 <input

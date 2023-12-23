@@ -6,6 +6,8 @@ import ProductList from '../components/ProductList';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart } from '../redux/cartSlice';
 import { loadScript } from '../helpers/payment';
+import Modal from '../components/Modal';
+import ApplyCoupon from '../components/ApplyCoupon';
 
 const Container = styled.div`
   padding: 1rem 0.5rem;  
@@ -123,6 +125,12 @@ const AddToCartButton = styled.button`
   }
 `;
 
+const CouponBtn = styled.p`
+  text-decoration: underline;
+  font-size: 1.3rem;
+  font-weight: 500;
+`
+
 const BuyNowButton = styled.button`
   background-color: #3498db;
   color: white;
@@ -132,6 +140,8 @@ const BuyNowButton = styled.button`
 `;
 
 const ProductPage = () => {
+  const [selectedCoupon, setSelectedCoupon] = useState(null)
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false)
   const user = useSelector(p => p.user.user)
   console.log(user)
   const [quantity, setQuantity] = useState(1)
@@ -159,7 +169,7 @@ const ProductPage = () => {
   const handleBuy = async (e) => {
     e.preventDefault();
 
-    if(!user) return navigate('/login')
+    if(Array.isArray(user) || !user) return navigate('/login')
 
     let Dborder;
     const { address, name, email } = user
@@ -170,12 +180,13 @@ const ProductPage = () => {
         quantity: +quantity,
       }
     }
+    if(selectedCoupon) body["coupon"] = selectedCoupon._id
     await loadScript("https://checkout.razorpay.com/v1/checkout.js")
     try {
       const {data} = await userRequest.post("order/checkout", body)
       Dborder = data.order;
     } catch (error) {
-      
+      return
     }
 
     if(!window.Razorpay) {
@@ -226,7 +237,12 @@ const ProductPage = () => {
             <ProductPrice>Price : {product.price}</ProductPrice>
             <ProductDescription>{product.description}</ProductDescription>
             
+            {selectedCoupon ? 
+              <CouponBtn onClick={() => setSelectedCoupon(null)} >COUPON : {selectedCoupon.percentageDiscount}% Upto {selectedCoupon.maxDiscountAmount} Rs.</CouponBtn> :
+              <CouponBtn onClick={() => setIsCouponModalOpen(p => !p)} >Add Coupon</CouponBtn>
+            }
             <BottomSection>
+                
                 <QuatitySection>
                     Quantity : <select value={quantity} onChange={e => setQuantity(e.target.value)}>{Array(product.stock > 10 ? 10 : product.stock).fill().map((_,i) => <option key={i}>{++i}</option>)}</select>
                 </QuatitySection>
@@ -247,6 +263,10 @@ const ProductPage = () => {
           </div>
       </>
       : null}
+
+      <Modal isOpen={isCouponModalOpen} setIsOpen={setIsCouponModalOpen} title="Select Offer Coupon" >
+        <ApplyCoupon productPrice={product.price} setIsOpen={setIsCouponModalOpen} agent={product?.agent} setSelectedCoupon={setSelectedCoupon} />
+      </Modal>
     </>
   );
 };
